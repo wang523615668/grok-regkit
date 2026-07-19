@@ -1,0 +1,16 @@
+.env
+*.token
+*.key
+cookie*
+*.cookie
+*.db
+*.sqlite
+__pycache__/
+*.pyc
+.venv/
+.chrome-data/
+deploy/nginx-*.snippet.conf
+config.json
+cpa_auths/
+accounts_*.txt
+config.json.bak*

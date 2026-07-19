@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>注册机</title>
+  <style>
+    :root {
+      --bg: #FAF9F5;
+      --card: #ffffff;
+      --border: #e8e4da;
+      --border-soft: #ece8de;
+      --text: #171717;
+      --muted: #8a8478;
+      --muted-2: #a39c90;
+      --primary: #111111;
+      --primary-hover: #2a2a2a;
+      --ok: #059669;
+      --ok-bg: #ecfdf5;
+      --bad: #dc2626;
+      --bad-bg: #fef2f2;
+      --soft: #f5f1e8;
+      --input: #ffffff;
+      --radius: 12px;
+      --radius-lg: 16px;
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --font: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+    button, input, select { font: inherit; color: inherit; }
+    a { color: inherit; }
+
+    /* login — same light shell as g2a/chatgpt2api */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(250, 249, 245, .92);
+    }
+    .login-overlay.hidden { display: none; }
+    .login-card {
+      width: min(380px, calc(100vw - 32px));
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.06);
+      text-align: center;
+    }
+    .login-brand {
+      font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600; margin-bottom: 8px;
+    }
+    .login-card h1 { font-size: 18px; font-weight: 650; margin-bottom: 6px; }
+    .login-card p { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    .login-card input {
+      width: 100%; height: 36px; padding: 0 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: #fff; text-align: center; outline: none;
+    }
+    .login-card input:focus { border-color: #bbb; }
+    .login-err { min-height: 1.2rem; color: var(--bad); font-size: 12px; margin-top: 8px; }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px 16px 28px;
+    }
+    /* Embedded under admin top nav — match admin page feel */
+    body.embed-mode {
+      background: #FAF9F5;
+      min-height: 100%;
+    }
+    body.embed-mode .page {
+      padding: 12px 28px 20px;
+      max-width: 1280px;
+    }
+    body.embed-mode .page-title,
+    body.embed-mode .page-sub { display: none; }
+    body.embed-mode .page-hd {
+      margin-bottom: 12px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    body.embed-mode .login-overlay {
+      background: #FAF9F5;
+    }
+    body.embed-mode .login-card {
+      border-color: #e8e2d6;
+      box-shadow: none;
+    }
+
+    /* page header like chatgpt2api register */
+    .page-hd {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .page-title { font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; }
+    .page-sub { font-size: 13px; color: var(--muted); margin-top: 5px; }
+    .page-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 32px; padding: 0 12px; border-radius: 999px;
+      border: 1px solid var(--border); background: #fff;
+      color: var(--muted); font-size: 12px; font-weight: 600;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #c4bfb4; }
+    .dot.run { background: var(--ok); box-shadow: 0 0 0 4px rgba(5,150,105,.12); }
+    .dot.idle { background: #c4bfb4; }
+
+    .btn {
+      height: 32px; padding: 0 14px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: 13px; font-weight: 600; border: 1px solid var(--border);
+      background: #fafafa; color: #444; cursor: pointer; text-decoration: none;
+      transition: .12s ease;
+    }
+    .btn:hover:not(:disabled) { background: #f3f3f3; border-color: #dcdcdc; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: #111; border-color: #111; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #222; border-color: #222; }
+    .btn-danger {
+      background: #fff5f5; border-color: #f0c9c9; color: #b91c1c;
+    }
+    .btn-danger:hover:not(:disabled) { background: #ffecec; }
+    .btn-ghost { background: transparent; }
+
+    /* metric strip */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 720px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .metric {
+      min-height: 76px; padding: 14px 16px;
+      border: 1px solid rgba(232, 228, 218, .9);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+    .metric .label {
+      font-size: 11px; color: var(--muted); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .metric .value {
+      margin-top: 8px; font-size: 24px; font-weight: 650; letter-spacing: -.03em;
+      line-height: 1;
+    }
+    .metric .value.ok { color: var(--ok); }
+    .metric .value.bad { color: var(--bad); }
+    .metric .value.sm { font-size: 16px; padding-top: 4px; }
+
+    /* two-column layout */
+    .layout {
+      display: grid;
+      gap: 16px;
+    }
+    @media (min-width: 1100px) {
+      .layout {
+        grid-template-columns: 1.05fr .95fr;
+        align-items: start;
+      }
+      .runtime-col { position: sticky; top: 16px; }
+      body.embed-mode .runtime-col { top: 8px; }
+    }
+
+    /* form section cards */
+    .section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+    }
+    .section + .section { margin-top: 14px; }
+    .section-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 10px; margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 11px; line-height: 1.25; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--muted); font-weight: 650;
+    }
+    .section-sub {
+      margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--muted-2);
+      text-transform: none; letter-spacing: 0; font-weight: 400;
+    }
+
+    .form-grid { display: grid; gap: 12px; }
+    @media (min-width: 720px) {
+      .form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .span-2, .span-full { grid-column: 1 / -1; }
+    }
+    .field { display: grid; gap: 7px; min-width: 0; }
+    .label { font-size: 12px; color: var(--muted); }
+    .hint { font-size: 12px; color: var(--muted-2); line-height: 1.55; }
+
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%; height: 36px; padding: 0 11px;
+      border-radius: 8px; border: 1px solid var(--border);
+      background: var(--input); outline: none;
+      min-width: 0;
+    }
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 30px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a8478' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    select option { white-space: normal; }
+    input:focus, select:focus { border-color: #cfc8ba; }
+    input:disabled, select:disabled { opacity: .6; background: #f7f5f0; }
+
+    .check-row {
+      display: flex; align-items: center; gap: 8px;
+      min-height: 36px; font-size: 13px;
+    }
+    .check-row input { width: auto; height: auto; }
+
+    .provider-tabs {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px;
+    }
+    .provider-tab {
+      height: 36px; border-radius: 10px; border: 1px solid var(--border);
+      background: #faf8f3; color: var(--muted); font-size: 13px; font-weight: 650;
+      cursor: pointer;
+    }
+    .provider-tab.active {
+      color: #111; background: #fff; border-color: #d6d0c4;
+      box-shadow: inset 0 0 0 1px #efeae0;
+    }
+    .soft-box {
+      border: 1px solid rgba(232,228,218,.9);
+      background: rgba(245, 241, 232, .35);
+      border-radius: 12px; padding: 12px; display: grid; gap: 12px;
+    }
+
+    .action-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+    }
+    .tips {
+      margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.6;
+      display: grid; gap: 2px;
+    }
+    .tips p { margin: 0; }
+
+    /* runtime */
+    .log-section { display: flex; flex-direction: column; min-height: 420px; }
+    .log-toolbar {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 10px; margin-bottom: 10px;
+    }
+    .log-box {
+      flex: 1; min-height: 320px; max-height: min(58vh, 560px);
+      overflow: auto; border-radius: 12px;
+      background: #111; border: 1px solid #2a2a2a;
+      padding: 12px; font-family: var(--mono); font-size: 12px; line-height: 1.5;
+    }
+    body.embed-mode .log-box { max-height: min(52vh, 520px); }
+    .log-line { color: #d4d4d8; white-space: pre-wrap; word-break: break-word; margin-bottom: 2px; }
+    .log-line.ok { color: #4ade80; }
+    .log-line.err { color: #fca5a5; }
+    .log-line.info { color: #93c5fd; }
+    .file-line { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+    .toast {
+      position: fixed; right: 16px; bottom: 16px; z-index: 40;
+      background: #fff; border: 1px solid var(--border); color: var(--text);
+      padding: 10px 14px; border-radius: 10px; font-size: 13px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08); display: none;
+    }
+    .toast.show { display: block; }
+
+    code.inline {
+      font-family: var(--mono); font-size: 11px; color: #555;
+      background: #f3efe6; padding: 1px 5px; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-brand">Grok Register</div>
+      <h1>注册控制台</h1>
+      <p>输入访问密码继续</p>
+      <input id="loginPass" type="password" placeholder="访问密码" autofocus />
+      <div style="margin-top:12px">
+        <button id="loginBtn" class="btn btn-primary" type="button" style="width:100%;height:36px;border-radius:8px">继续</button>
+      </div>
+      <div id="loginErr" class="login-err"></div>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="page-hd">
+      <div>
+        <div class="page-title">注册账号</div>
+        <div class="page-sub">启动前会自动保存配置 · 成功后可写入 SSO 号池</div>
+      </div>
+      <div class="page-actions">
+        <span class="status-chip">
+          <span id="runDot" class="dot idle"></span>
+          <span id="runLabel">已停止</span>
+        </span>
+        <button id="saveBtn" class="btn" type="button">保存配置</button>
+        <button id="startBtn" class="btn btn-primary" type="button">启动</button>
+        <button id="stopBtn" class="btn btn-danger" type="button">停止</button>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric"><div class="label">成功</div><div id="mSuccess" class="value ok">0</div></div>
+      <div class="metric"><div class="label">失败</div><div id="mFail" class="value bad">0</div></div>
+      <div class="metric"><div class="label">目标数量</div><div id="mTarget" class="value">0</div></div>
+      <div class="metric"><div class="label">状态</div><div id="mState" class="value sm">空闲</div></div>
+    </div>
+
+    <div class="layout">
+      <div class="config-col">
+        <!-- 任务参数 -->
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">任务参数</div>
+              <div class="section-sub">按数量注册，建议先用 1 试跑</div>
+            </div>
+          </div>
+          <div class="form-grid two">
+            <div class="field">
+              <div class="label">注册数量</div>
+              <input id="regCount" type="number" min="1" max="1000" value="1" />
+            </div>
+            <div class="field">
+              <div class="label">注册模式</div>
+              <select id="registerMode" title="全浏览器更稳；混合更快（协议+短浏览器）">
+                <option value="browser" selected>全浏览器</option>
+                <option value="hybrid">混合（更快）</option>
+              </select>
+            </div>
+            <div class="field span-2">
+              <div class="label">代理模式</div>
+              <select id="proxyMode">
+                <option value="airport" selected>机场 Mihomo</option>
+                <option value="cliproxy_white">Cliproxy 白名单</option>
+                <option value="direct">直连</option>
+                <option value="custom">自定义代理 URL</option>
+                <option value="whitelist">用户名代理组（旧）</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="label">国家 / 地区</div>
+              <select id="proxy_country">
+                <option value="US" selected>US 美国</option>
+                <option value="Rand">Rand 随机</option>
+                <option value="JP">JP 日本</option>
+                <option value="HK">HK 香港</option>
+                <option value="SG">SG 新加坡</option>
+                <option value="TW">TW 台湾</option>
+                <option value="GB">GB 英国</option>
+                <option value="DE">DE 德国</option>
+                <option value="KR">KR 韩国</option>
+                <option value="AU">AU 澳大利亚</option>
+                <option value="CA">CA 加拿大</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="label">轮转时长（分钟）</div>
+              <input id="proxy_duration" type="number" min="1" max="1440" value="10" placeholder="10" />
+            </div>
+            <div class="field span-2">
+              <label class="check-row"><input id="enable_nsfw" type="checkbox" checked /> 注册成功后尝试开启 NSFW</label>
+              <label class="check-row" style="margin-top:6px"><input id="nsfw_async" type="checkbox" checked /> NSFW 后台执行（推荐，不挡下一号）</label>
+              <label class="check-row" style="margin-top:6px"><input id="post_success_async" type="checkbox" checked /> g2a 入池 + CPA 后台补写（推荐）</label>
+              <div class="hint" style="margin-top:6px">混合模式：浏览器只取 Castle/Turnstile，发码验码与最终注册走协议。后台仍会做 NSFW / 入池 / 4.5 mint。</div>
+            </div>
+          </div>
+
+          <div id="proxyAirportBox" class="soft-box" style="margin-top:12px">
+            <div class="form-grid two">
+              <div class="field span-2">
+                <div class="label">机场本地 HTTP 入口（Mihomo REGISTER-RESIDENTIAL）</div>
+                <input id="proxy_airport_url" type="text" value="http://127.0.0.1:7893" />
+              </div>
+              <div class="field span-2">
+                <div class="label">说明</div>
+                <div class="hint">
+                  订阅已接入服务器 Mihomo 的 <code class="inline">airport</code> 提供商，
+                  代理组 <code class="inline">REGISTER-RESIDENTIAL</code>（美国节点）监听
+                  <code class="inline">7893</code>。
+                  不是 Cliproxy 的 ip:port；浏览器走本地 HTTP 代理即可。
+                </div>
+              </div>
+            </div>
+            <div class="action-bar">
+              <button id="testProxyBtnAirport" class="btn" type="button">测试机场出口</button>
+            </div>
+          </div>
+
+          <div id="proxyCliproxyBox" class="soft-box" style="display:none;margin-top:12px">
+            <div class="form-grid two">
+              <div class="field span-2">
+                <div class="label">Cliproxy 白名单 API</div>
+                <input id="proxy_api_url" type="text" value="https://api.cliproxy.io/white/api" />
+              </div>
+              <div class="field">
+                <div class="label">每批提取数量 num</div>
+                <input id="proxy_api_num" type="number" min="1" max="20" value="5" />
+              </div>
+              <div class="field">
+                <div class="label">返回格式</div>
+                <select id="proxy_api_format">
+                  <option value="n" selected>n（换行）</option>
+                  <option value="rn">rn（\\r\\n）</option>
+                </select>
+              </div>
+              <div class="field span-2">
+                <div class="label">IP 质量 API（IPPure）</div>
+                <input id="proxy_quality_api" type="text" value="https://my.ippure.com/v1/info" />
+              </div>
+              <div class="field">
+                <div class="label">最大风险分 fraudScore</div>
+                <input id="proxy_max_fraud_score" type="number" min="0" max="100" value="40" />
+              </div>
+              <div class="field">
+                <div class="label">质量检测批次数</div>
+                <input id="proxy_quality_max_tries" type="number" min="1" max="20" value="8" />
+              </div>
+              <div class="field span-2">
+                <label class="check-row"><input id="proxy_quality_check" type="checkbox" checked disabled /> 启用质量检测（服务器强制开启）</label>
+                <label class="check-row"><input id="proxy_check_entry_host" type="checkbox" /> 备注入口网关 IP（仅日志，不拦截；Cliproxy 入口常是 Zenlayer）</label>
+                <label class="check-row"><input id="proxy_check_exit_ippure" type="checkbox" checked disabled /> 出口 IPPure 检测（强制：真正的家宽/风险分看这里）</label>
+                <label class="check-row"><input id="proxy_require_residential" type="checkbox" checked /> 出口必须是住宅 IP</label>
+                <label class="check-row"><input id="proxy_require_country_match" type="checkbox" checked /> 出口国家必须匹配（建议 US，勿用 Rand）</label>
+                <label class="check-row"><input id="proxy_reject_datacenter_org" type="checkbox" checked /> 出口拒绝机房/云厂商 ASN</label>
+                <p class="hint" style="margin-top:6px">Cliproxy white 返回的 <code class="inline">107.151.x.x:端口</code> 是共享入口网关；同一网关不同端口往往是不同出口家宽（如 Spectrum / WideOpenWest）。质量以出口 IPPure 为准。</p>
+              </div>
+              <div class="field span-2">
+                <div class="label">预览请求 URL</div>
+                <div id="proxyPreview" class="hint" style="font-family:var(--mono);word-break:break-all">—</div>
+              </div>
+            </div>
+            <div class="action-bar">
+              <button id="testProxyBtn" class="btn" type="button">测试提取+质量检测</button>
+            </div>
+            <div class="tips" style="margin-top:8px">
+              <p>· <b>入口</b>：Cliproxy 返回的 host 多半是机房网关（Zenlayer），正常现象，不代表出口是机房。</p>
+              <p>· <b>出口</b>：经该端口访问 IPPure；要求住宅、国家匹配、fraud 不过高。</p>
+              <p>· 若使用白名单代理，请把本机/服务器出口 IP 加到供应商白名单。</p>
+            </div>
+          </div>
+
+          <div id="proxyCustomBox" class="soft-box" style="display:none;margin-top:12px">
+            <div class="field">
+              <div class="label">代理地址</div>
+              <input id="proxy" type="text" placeholder="http://user:pass@host:port" />
+            </div>
+          </div>
+
+          <div id="proxyGroupBox" class="soft-box" style="display:none;margin-top:12px">
+            <div class="form-grid two">
+              <div class="field">
+                <div class="label">代理主机</div>
+                <input id="proxy_host" type="text" placeholder="gate.example.com" />
+              </div>
+              <div class="field">
+                <div class="label">端口</div>
+                <input id="proxy_port" type="text" placeholder="1000" />
+              </div>
+              <div class="field">
+                <div class="label">用户名（前缀）</div>
+                <input id="proxy_user" type="text" placeholder="your-user" />
+              </div>
+              <div class="field">
+                <div class="label">密码</div>
+                <input id="proxy_pass" type="password" autocomplete="off" />
+              </div>
+              <div class="field">
+                <div class="label">分隔符</div>
+                <input id="proxy_delimiter" type="text" value="-" placeholder="-" maxlength="5" />
+              </div>
+              <div class="field">
+                <div class="label">会话 ID（可选）</div>
+                <input id="proxy_session" type="text" placeholder="留空自动生成" />
+              </div>
+              <div class="field span-2">
+                <div class="label">用户名模板</div>
+                <input id="proxy_user_template" type="text" value="{user}{delimiter}region{delimiter}{country}" />
+              </div>
+            </div>
+          </div>
+
+          <div class="tips">
+            <p>· 点「启动」会先保存当前配置，再开始任务。</p>
+          </div>
+        </div>
+
+        <!-- 邮箱来源 -->
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">邮箱来源</div>
+              <div class="section-sub">只启用一种即可，切换 Tab 填写对应参数</div>
+            </div>
+          </div>
+          <div class="provider-tabs">
+            <button type="button" class="provider-tab active" data-p="cloudflare">Cloudflare</button>
+            <button type="button" class="provider-tab" data-p="duckmail">DuckMail</button>
+            <button type="button" class="provider-tab" data-p="yyds">YYDS</button>
+          </div>
+          <input type="hidden" id="email_provider" value="cloudflare" />
+
+          <div id="panel-cloudflare" class="soft-box">
+            <div class="form-grid two">
+              <div class="field span-2">
+                <div class="label">API 地址</div>
+                <input id="cloudflare_api_base" type="text" placeholder="https://你的-worker-api-域名" />
+              </div>
+              <div class="field">
+                <div class="label">收信域名</div>
+                <input id="defaultDomains" type="text" placeholder="mail.example.com" />
+              </div>
+              <div class="field">
+                <div class="label">鉴权模式</div>
+                <select id="cloudflare_auth_mode">
+                  <option value="none">none（匿名，默认）</option>
+                  <option value="x-admin-auth">x-admin-auth（管理员）</option>
+                  <option value="bearer">bearer</option>
+                  <option value="x-api-key">x-api-key</option>
+                  <option value="query-key">query-key</option>
+                </select>
+              </div>
+              <div class="field span-2">
+                <div class="label">密钥 / 管理员密码（匿名可留空）</div>
+                <input id="cloudflare_api_key" type="password" autocomplete="off" placeholder="admin 模式再填" />
+              </div>
+            </div>
+          </div>
+
+          <div id="panel-duckmail" class="soft-box" style="display:none">
+            <div class="field">
+              <div class="label">DuckMail API Key</div>
+              <input id="duckmail_api_key" type="password" autocomplete="off" placeholder="必填" />
+            </div>
+          </div>
+
+          <div id="panel-yyds" class="soft-box" style="display:none">
+            <div class="form-grid two">
+              <div class="field">
+                <div class="label">YYDS API Key</div>
+                <input id="yyds_api_key" type="password" autocomplete="off" placeholder="必填" />
+              </div>
+              <div class="field">
+                <div class="label">YYDS JWT（可选）</div>
+                <input id="yyds_jwt" type="password" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SSO 号池入池 -->
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">SSO 号池</div>
+              <div class="section-sub">注册成功后自动写入同机号池（可一键开启）</div>
+            </div>
+            <span class="status-chip">
+              <span id="g2aDot" class="dot idle"></span>
+              <span id="g2aLabel">检测中</span>
+            </span>
+          </div>
+          <div class="form-grid two">
+            <div class="field">
+              <div class="label">联动状态</div>
+              <div id="g2aLinkedText" style="font-weight:650;padding-top:8px;font-size:14px">—</div>
+            </div>
+            <div class="field">
+              <div class="label">号池账号数</div>
+              <div id="g2aCount" style="font-weight:650;padding-top:8px;font-size:14px">—</div>
+            </div>
+            <div class="field span-2">
+              <div class="label">号池管理密码（app_key）</div>
+              <input id="linkAppKey" type="password" autocomplete="off" placeholder="默认管理密码" />
+            </div>
+            <label class="check-row"><input id="grok2api_auto_add_remote" type="checkbox" /> 注册成功后写入号池</label>
+            <label class="check-row"><input id="grok2api_auto_add_local" type="checkbox" /> 同时写本地 token 文件</label>
+            <div class="field span-2">
+              <div class="label">号池地址</div>
+              <input id="grok2api_remote_base" type="text" placeholder="http://127.0.0.1:8010" />
+            </div>
+            <div class="field">
+              <div class="label">app_key</div>
+              <input id="grok2api_remote_app_key" type="password" autocomplete="off" />
+            </div>
+            <div class="field">
+              <div class="label">池名称</div>
+              <input id="grok2api_pool_name" type="text" placeholder="ssoBasic" />
+            </div>
+            <div class="field span-2">
+              <div class="label">本地 token 文件路径</div>
+              <input id="grok2api_local_token_file" type="text" placeholder="可选" />
+            </div>
+          </div>
+          <div class="action-bar">
+            <button id="linkG2aBtn" class="btn btn-primary" type="button">一键开启联动</button>
+            <button id="unlinkG2aBtn" class="btn" type="button">关闭自动入池</button>
+            <button id="refreshG2aBtn" class="btn btn-ghost" type="button">刷新状态</button>
+            <a id="openG2aBtn" class="btn" href="http://127.0.0.1:8010/admin/account" target="_blank" rel="noopener">打开账号池</a>
+          </div>
+          <div class="tips">
+            <p>· 内网优先：<code class="inline">http://127.0.0.1:8010</code></p>
+            <p>· 密钥显示 <code class="inline">***</code> 表示已保存，不改则保留。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="runtime-col">
+        <div class="section log-section">
+          <div class="log-toolbar">
+            <div>
+              <div class="section-title">运行日志</div>
+              <div class="section-sub">实时输出注册过程</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="clearLogBtn" class="btn btn-ghost" type="button">清空显示</button>
+              <button id="listBtn" class="btn" type="button">账号文件</button>
+              <button id="dlBtn" class="btn" type="button">下载账号</button>
+            </div>
+          </div>
+          <div id="term" class="log-box"></div>
+          <div id="lastFile" class="file-line">账号文件：—</div>
+          <div class="tips">
+            <p>· 任务运行中可点「停止」中断。</p>
+            <p>· 成功账号会写入 <code class="inline">accounts_*.txt</code>，并按配置入池。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const AUTH_KEY = 'grok_reg_auth_key';
+    let authKey = localStorage.getItem(AUTH_KEY) || '';
+    let pollTimer = null;
+    let logTimer = null;
+    let knownLogLines = new Set();
+    let running = false;
+
+    const $ = (id) => document.getElementById(id);
+
+    function toast(msg) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    function headers(json = false) {
+      const h = {};
+      if (json) h['Content-Type'] = 'application/json';
+      if (authKey) h['X-Access-Key'] = authKey;
+      return h;
+    }
+
+    function appendLog(line) {
+      if (!line || knownLogLines.has(line)) return;
+      knownLogLines.add(line);
+      if (knownLogLines.size > 4000) knownLogLines = new Set(Array.from(knownLogLines).slice(-2000));
+      const el = document.createElement('div');
+      el.className = 'log-line';
+      if (/\[-\]|\[!\]|失败|error|Error|异常/.test(line)) el.classList.add('err');
+      else if (/\[\+\]|成功/.test(line)) el.classList.add('ok');
+      else if (/\[\*\]/.test(line)) el.classList.add('info');
+      el.textContent = line;
+      const term = $('term');
+      term.appendChild(el);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function setProvider(p) {
+      $('email_provider').value = p;
+      document.querySelectorAll('.provider-tab').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.p === p);
+      });
+      $('panel-cloudflare').style.display = p === 'cloudflare' ? 'grid' : 'none';
+      $('panel-duckmail').style.display = p === 'duckmail' ? 'grid' : 'none';
+      $('panel-yyds').style.display = p === 'yyds' ? 'grid' : 'none';
+    }
+
+    function syncProxyMode() {
+      const mode = $('proxyMode').value;
+      if ($('proxyAirportBox')) $('proxyAirportBox').style.display = mode === 'airport' ? 'block' : 'none';
+      if ($('proxyCliproxyBox')) $('proxyCliproxyBox').style.display = mode === 'cliproxy_white' ? 'grid' : 'none';
+      if ($('proxyCustomBox')) $('proxyCustomBox').style.display = mode === 'custom' ? 'grid' : 'none';
+      if ($('proxyGroupBox')) $('proxyGroupBox').style.display = mode === 'whitelist' ? 'grid' : 'none';
+      updateProxyPreview();
+    }
+
+    function updateProxyPreview() {
+      const el = $('proxyPreview');
+      if (!el) return;
+      const mode = $('proxyMode').value;
+      if (mode === 'airport') {
+        el.textContent = ($('proxy_airport_url')?.value || 'http://127.0.0.1:7893').trim();
+        return;
+      }
+      if (mode === 'cliproxy_white') {
+        const base = ($('proxy_api_url').value || 'https://api.cliproxy.io/white/api').trim();
+        let region = ($('proxy_country').value || 'US').trim() || 'US';
+        if (region.toUpperCase() === 'RAND') region = 'Rand';
+        const time = String($('proxy_duration').value || '10').trim() || '10';
+        const num = String($('proxy_api_num').value || '1').trim() || '1';
+        const format = ($('proxy_api_format').value || 'n').trim() || 'n';
+        if (base.includes('?')) {
+          el.textContent = base;
+        } else {
+          el.textContent = `${base}?region=${encodeURIComponent(region)}&num=${encodeURIComponent(num)}&time=${encodeURIComponent(time)}&format=${encodeURIComponent(format)}&type=txt`;
+        }
+        return;
+      }
+      if (mode !== 'whitelist') {
+        el.textContent = mode === 'custom' ? (($('proxy')?.value || '').trim() || '—') : '—';
+        return;
+      }
+      const user = ($('proxy_user').value || '').trim();
+      const host = ($('proxy_host').value || '').trim();
+      const port = ($('proxy_port').value || '').trim();
+      const country = ($('proxy_country').value || 'US').trim().toUpperCase();
+      const delim = ($('proxy_delimiter').value || '-');
+      let duration = String($('proxy_duration').value || '10').trim();
+      duration = (duration.match(/\d+/) || ['10'])[0];
+      const session = ($('proxy_session').value || '').trim() || 'auto';
+      let tpl = ($('proxy_user_template').value || '{user}{delimiter}region{delimiter}{country}').trim();
+      let username = tpl
+        .replaceAll('{user}', user)
+        .replaceAll('{country}', country)
+        .replaceAll('{delimiter}', delim)
+        .replaceAll('{session}', session)
+        .replaceAll('{duration}', duration)
+        .replaceAll('{t}', `t-${duration}`)
+        .replaceAll('{host}', host)
+        .replaceAll('{port}', port);
+      if (!host || !port) {
+        el.textContent = '请填写主机和端口';
+        return;
+      }
+      const auth = username ? `${username}:****@` : '';
+      el.textContent = `http://${auth}${host}:${port}`;
+    }
+
+    async function testCliproxyFetch() {
+      await saveConfig(true);
+      try {
+        const r = await fetch('/api/proxy/test', { method: 'POST', headers: headers(true), body: '{}' });
+        const data = await r.json();
+        (data.logs || []).forEach((line) => appendLog(line));
+        if (!r.ok || !data.ok) {
+          appendLog('[!] 提取/质检失败: ' + (data.detail || JSON.stringify(data)));
+          toast('提取失败');
+          return;
+        }
+        appendLog('[+] 测试选用代理: ' + data.proxy);
+        if (data.quality) {
+          const q = data.quality;
+          appendLog(
+            `[*] IPPure: ip=${q.ip || ''} country=${q.countryCode || ''} fraud=${q.fraudScore} residential=${q.isResidential} org=${q.asOrganization || ''}`
+          );
+        }
+        toast('合格代理: ' + data.proxy);
+      } catch (e) {
+        appendLog('[!] 提取代理异常: ' + e);
+        toast('提取异常');
+      }
+    }
+
+    async function tryAuth() {
+      const pass = $('loginPass').value.trim();
+      if (!pass) return;
+      try {
+        const r = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass }),
+        });
+        const data = await r.json();
+        if (!data.ok) {
+          $('loginErr').textContent = '密码错误';
+          return;
+        }
+        if (data.needs_auth) {
+          authKey = data.token || pass;
+          localStorage.setItem(AUTH_KEY, authKey);
+        } else {
+          authKey = '';
+          localStorage.removeItem(AUTH_KEY);
+        }
+        $('loginOverlay').classList.add('hidden');
+        await boot();
+      } catch (e) {
+        $('loginErr').textContent = '连接失败';
+      }
+    }
+
+    async function ensureAuth() {
+      try {
+        const r = await fetch('/api/config', { headers: headers() });
+        if (r.status === 401 || r.status === 403) {
+          $('loginOverlay').classList.remove('hidden');
+          return false;
+        }
+        if (r.ok) {
+          $('loginOverlay').classList.add('hidden');
+          return true;
+        }
+      } catch (_) {}
+      try {
+        const r = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: '' }),
+        });
+        const data = await r.json();
+        if (data.ok && !data.needs_auth) {
+          $('loginOverlay').classList.add('hidden');
+          return true;
+        }
+      } catch (_) {}
+      $('loginOverlay').classList.remove('hidden');
+      return false;
+    }
+
+    function setVal(id, value) {
+      const el = $(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!value;
+      else el.value = value == null ? '' : value;
+    }
+
+    function getCfgPayload() {
+      const mode = $('proxyMode').value;
+      const airportUrl = ($('proxy_airport_url')?.value || 'http://127.0.0.1:7893').trim() || 'http://127.0.0.1:7893';
+      const customProxy = ($('proxy')?.value || '').trim();
+      let proxy = customProxy;
+      if (mode === 'airport') proxy = airportUrl;
+      else if (mode === 'direct') proxy = '';
+      else if (mode === 'custom') proxy = customProxy;
+      return {
+        email_provider: $('email_provider').value,
+        cloudflare_api_base: $('cloudflare_api_base').value.trim(),
+        cloudflare_api_key: $('cloudflare_api_key').value,
+        cloudflare_auth_mode: $('cloudflare_auth_mode').value,
+        defaultDomains: $('defaultDomains').value.trim(),
+        duckmail_api_key: $('duckmail_api_key').value,
+        yyds_api_key: $('yyds_api_key').value,
+        yyds_jwt: $('yyds_jwt').value,
+        proxy_mode: mode,
+        proxy,
+        proxy_airport_url: airportUrl,
+        proxy_api_url: ($('proxy_api_url')?.value || 'https://api.cliproxy.io/white/api').trim(),
+        proxy_api_num: parseInt($('proxy_api_num')?.value || '5', 10) || 5,
+        proxy_api_format: ($('proxy_api_format')?.value || 'n').trim(),
+        proxy_api_type: 'txt',
+        proxy_quality_api: ($('proxy_quality_api')?.value || 'https://my.ippure.com/v1/info').trim(),
+        // Quality forced ON; exit IPPure is authoritative for Cliproxy white.
+        proxy_quality_check: true,
+        proxy_check_entry_host: !!$('proxy_check_entry_host')?.checked,
+        proxy_check_exit_ippure: true,
+        proxy_entry_hard_reject: false,
+        proxy_max_fraud_score: parseInt($('proxy_max_fraud_score')?.value || '40', 10) || 40,
+        proxy_require_residential: !!$('proxy_require_residential')?.checked,
+        proxy_require_country_match: !!$('proxy_require_country_match')?.checked,
+        proxy_reject_datacenter_org: !!$('proxy_reject_datacenter_org')?.checked,
+        proxy_reject_hosting_flag: true,
+        proxy_quality_max_tries: parseInt($('proxy_quality_max_tries')?.value || '8', 10) || 8,
+        proxy_host: $('proxy_host')?.value.trim() || '',
+        proxy_port: $('proxy_port')?.value.trim() || '',
+        proxy_user: $('proxy_user')?.value.trim() || '',
+        proxy_pass: $('proxy_pass')?.value || '',
+        proxy_country: ($('proxy_country').value || 'US').trim(),
+        proxy_delimiter: ($('proxy_delimiter')?.value || '-'),
+        proxy_duration: String($('proxy_duration').value || '10').trim(),
+        proxy_user_template: ($('proxy_user_template')?.value || '{user}{delimiter}region{delimiter}{country}').trim(),
+        proxy_session: $('proxy_session')?.value.trim() || '',
+        enable_nsfw: $('enable_nsfw').checked,
+        nsfw_async: $('nsfw_async') ? $('nsfw_async').checked : true,
+        post_success_async: $('post_success_async') ? $('post_success_async').checked : true,
+        register_count: parseInt($('regCount').value, 10) || 1,
+        register_mode: ($('registerMode')?.value || 'browser'),
+        grok2api_auto_add_local: $('grok2api_auto_add_local').checked,
+        grok2api_auto_add_remote: $('grok2api_auto_add_remote').checked,
+        grok2api_remote_base: $('grok2api_remote_base').value.trim(),
+        grok2api_remote_app_key: $('grok2api_remote_app_key').value,
+        grok2api_pool_name: $('grok2api_pool_name').value.trim() || 'ssoBasic',
+        grok2api_local_token_file: $('grok2api_local_token_file').value.trim(),
+      };
+    }
+
+    async function loadConfig() {
+      const r = await fetch('/api/config', { headers: headers() });
+      if (!r.ok) throw new Error('加载配置失败');
+      const data = await r.json();
+      const c = data.config || {};
+      setProvider(c.email_provider || 'cloudflare');
+      setVal('cloudflare_api_base', c.cloudflare_api_base || '');
+      setVal('cloudflare_api_key', c.cloudflare_api_key || '');
+      setVal('cloudflare_auth_mode', c.cloudflare_auth_mode || 'none');
+      setVal('defaultDomains', c.defaultDomains || '');
+      setVal('duckmail_api_key', c.duckmail_api_key || '');
+      setVal('yyds_api_key', c.yyds_api_key || '');
+      setVal('yyds_jwt', c.yyds_jwt || '');
+      setVal('proxy', c.proxy || '');
+      setVal('proxy_airport_url', c.proxy_airport_url || c.proxy || 'http://127.0.0.1:7893');
+      setVal('proxy_api_url', c.proxy_api_url || 'https://api.cliproxy.io/white/api');
+      setVal('proxy_api_num', c.proxy_api_num || 5);
+      setVal('proxy_api_format', c.proxy_api_format || 'n');
+      setVal('proxy_quality_api', c.proxy_quality_api || 'https://my.ippure.com/v1/info');
+      setVal('proxy_quality_check', c.proxy_quality_check !== false);
+      setVal('proxy_check_entry_host', !!c.proxy_check_entry_host);
+      setVal('proxy_check_exit_ippure', c.proxy_check_exit_ippure !== false);
+      setVal('proxy_max_fraud_score', c.proxy_max_fraud_score != null ? c.proxy_max_fraud_score : 40);
+      setVal('proxy_require_residential', c.proxy_require_residential !== false);
+      setVal('proxy_require_country_match', c.proxy_require_country_match !== false);
+      setVal('proxy_reject_datacenter_org', c.proxy_reject_datacenter_org !== false);
+      setVal('proxy_quality_max_tries', c.proxy_quality_max_tries || 8);
+      setVal('proxy_host', c.proxy_host || '');
+      setVal('proxy_port', c.proxy_port || '');
+      setVal('proxy_user', c.proxy_user || '');
+      setVal('proxy_pass', c.proxy_pass || '');
+      setVal('proxy_country', c.proxy_country || 'US');
+      setVal('proxy_delimiter', c.proxy_delimiter != null && c.proxy_delimiter !== '' ? c.proxy_delimiter : '-');
+      setVal('proxy_duration', c.proxy_duration || '10');
+      setVal('proxy_user_template', c.proxy_user_template || '{user}{delimiter}region{delimiter}{country}');
+      setVal('proxy_session', c.proxy_session || '');
+      let mode = (c.proxy_mode || '').trim();
+      // 旧配置：custom + 7893 视为机场模式，方便界面识别
+      if (!mode) mode = 'airport';
+      if (mode === 'custom' && String(c.proxy || '').includes(':7893')) mode = 'airport';
+      if (!$('proxyMode').querySelector(`option[value="${mode}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = mode;
+        opt.textContent = mode;
+        $('proxyMode').appendChild(opt);
+      }
+      $('proxyMode').value = mode;
+      // ensure country select has value even if custom code
+      const countrySel = $('proxy_country');
+      const country = (c.proxy_country || 'US').toUpperCase();
+      if (countrySel && ![...countrySel.options].some((o) => o.value === country)) {
+        const opt = document.createElement('option');
+        opt.value = country;
+        opt.textContent = country;
+        countrySel.appendChild(opt);
+      }
+      setVal('proxy_country', country);
+      syncProxyMode();
+      setVal('enable_nsfw', c.enable_nsfw !== false);
+      setVal('nsfw_async', c.nsfw_async !== false);
+      setVal('post_success_async', c.post_success_async !== false);
+      setVal('regCount', c.register_count || 1);
+      setVal('registerMode', (c.register_mode === 'hybrid' ? 'hybrid' : 'browser'));
+      setVal('grok2api_auto_add_local', !!c.grok2api_auto_add_local);
+      setVal('grok2api_auto_add_remote', !!c.grok2api_auto_add_remote);
+      setVal('grok2api_remote_base', c.grok2api_remote_base || '');
+      setVal('grok2api_remote_app_key', c.grok2api_remote_app_key || '');
+      setVal('grok2api_pool_name', c.grok2api_pool_name || 'ssoBasic');
+      setVal('grok2api_local_token_file', c.grok2api_local_token_file || '');
+      appendLog('[*] 配置已加载');
+    }
+
+    async function saveConfig(silent = false) {
+      const r = await fetch('/api/config', {
+        method: 'PUT',
+        headers: headers(true),
+        body: JSON.stringify(getCfgPayload()),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        appendLog('[!] 保存配置失败: ' + t);
+        toast('保存配置失败');
+        return false;
+      }
+      if (!silent) {
+        appendLog('[+] 配置已保存');
+        toast('配置已保存');
+      }
+      return true;
+    }
+
+    async function refreshStatus() {
+      try {
+        const r = await fetch('/api/status', { headers: headers() });
+        if (!r.ok) return;
+        const s = await r.json();
+        running = !!s.running;
+        $('mSuccess').textContent = s.success ?? 0;
+        $('mFail').textContent = s.fail ?? 0;
+        $('mTarget').textContent = s.target ?? 0;
+        $('mState').textContent = running ? '运行中' : '空闲';
+        $('runDot').className = 'dot ' + (running ? 'run' : 'idle');
+        $('runLabel').textContent = running ? '运行中' : '已停止';
+        $('startBtn').disabled = running;
+        if (s.last_accounts_file) {
+          const name = s.last_accounts_file.split(/[\\/]/).pop();
+          $('lastFile').textContent = '账号文件：' + name;
+        }
+      } catch (_) {}
+    }
+
+    async function pollLogs() {
+      try {
+        const r = await fetch('/api/logs/snapshot?limit=300', { headers: headers() });
+        if (!r.ok) return;
+        const data = await r.json();
+        (data.lines || []).forEach(appendLog);
+      } catch (_) {}
+    }
+
+    async function startJob() {
+      const count = parseInt($('regCount').value, 10) || 1;
+      if (!confirm('启动前会先保存当前配置，确认启动注册任务吗？')) return;
+      const ok = await saveConfig(true);
+      if (!ok) return;
+      const r = await fetch('/api/start', {
+        method: 'POST',
+        headers: headers(true),
+        body: JSON.stringify({ count }),
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        appendLog('[!] 启动失败: ' + text);
+        toast('启动失败');
+        return;
+      }
+      appendLog('[*] 注册任务已启动，数量=' + count);
+      toast('注册任务已启动');
+      refreshStatus();
+    }
+
+    async function stopJob() {
+      if (!confirm('确认请求停止当前注册任务吗？')) return;
+      const r = await fetch('/api/stop', { method: 'POST', headers: headers() });
+      if (!r.ok) {
+        appendLog('[!] 停止失败: ' + (await r.text()));
+        toast('停止失败');
+        return;
+      }
+      appendLog('[!] 已请求停止注册任务');
+      toast('已请求停止');
+      refreshStatus();
+    }
+
+    async function downloadAccounts() {
+      const r = await fetch('/api/accounts/download', { headers: headers() });
+      if (!r.ok) {
+        toast('还没有账号文件');
+        return;
+      }
+      const blob = await r.blob();
+      const cd = r.headers.get('content-disposition') || '';
+      const m = /filename="?([^";]+)"?/.exec(cd);
+      const name = m ? m[1] : 'accounts.txt';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function listAccountFiles() {
+      const r = await fetch('/api/accounts', { headers: headers() });
+      if (!r.ok) return;
+      const data = await r.json();
+      const files = data.files || [];
+      if (!files.length) {
+        appendLog('[*] 还没有 accounts_*.txt');
+        toast('暂无账号文件');
+        return;
+      }
+      appendLog('[*] 账号文件列表：');
+      files.slice(0, 10).forEach((f) => appendLog(`    ${f.name}  (${f.size} 字节)`));
+    }
+
+    async function refreshIntegration() {
+      try {
+        const r = await fetch('/api/integration', { headers: headers() });
+        if (!r.ok) return;
+        const data = await r.json();
+        const g2a = data.g2a || {};
+        const ok = !!g2a.ok;
+        $('g2aDot').className = 'dot ' + (ok ? 'run' : 'idle');
+        $('g2aLabel').textContent = ok ? '在线' : '离线';
+        $('g2aLinkedText').textContent = data.linked ? '已开启自动入池' : '未联动';
+        $('g2aLinkedText').style.color = data.linked ? 'var(--ok)' : 'var(--muted)';
+        $('g2aCount').textContent = g2a.account_count == null ? '（需正确 app_key）' : String(g2a.account_count);
+        if (g2a.admin_url) {
+          // open account pool instead of login when already in admin
+          $('openG2aBtn').href = (g2a.public_url || 'http://127.0.0.1:8010') + '/admin/account';
+        }
+        if (!$('grok2api_remote_base').value && data.defaults?.remote_base) {
+          $('grok2api_remote_base').value = data.defaults.remote_base;
+        }
+        if (!$('grok2api_pool_name').value) $('grok2api_pool_name').value = 'ssoBasic';
+      } catch (_) {
+        $('g2aLabel').textContent = '检测失败';
+      }
+    }
+
+    async function linkG2a(enable) {
+      const body = {
+        enable: !!enable,
+        app_key: $('linkAppKey').value.trim() || $('grok2api_remote_app_key').value.trim(),
+        remote_base: $('grok2api_remote_base').value.trim() || 'http://127.0.0.1:8010',
+        pool_name: $('grok2api_pool_name').value.trim() || 'ssoBasic',
+      };
+      const r = await fetch('/api/integration/link', {
+        method: 'POST',
+        headers: headers(true),
+        body: JSON.stringify(body),
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        toast(enable ? '开启联动失败' : '关闭失败');
+        appendLog('[!] 联动失败: ' + text);
+        return;
+      }
+      toast(enable ? '已开启自动入池' : '已关闭自动入池');
+      appendLog(enable ? '[+] 已联动号池，注册成功将自动入池' : '[*] 已关闭自动入池');
+      await loadConfig();
+      await refreshIntegration();
+    }
+
+    async function boot() {
+      await loadConfig();
+      await refreshStatus();
+      await refreshIntegration();
+      await pollLogs();
+      if (pollTimer) clearInterval(pollTimer);
+      if (logTimer) clearInterval(logTimer);
+      pollTimer = setInterval(refreshStatus, 2000);
+      logTimer = setInterval(pollLogs, 1500);
+      setInterval(refreshIntegration, 15000);
+    }
+
+    // embed under admin iframe (same top nav as 账户/配置)
+    if (new URLSearchParams(location.search).get('embed') === '1') {
+      document.body.classList.add('embed-mode');
+      document.title = '注册机';
+      // Avoid a second "注册控制台" chrome when already inside admin shell
+      try {
+        const brand = document.querySelector('.login-brand');
+        if (brand) brand.textContent = 'Grok Register';
+        const h1 = document.querySelector('.login-card h1');
+        if (h1) h1.textContent = '注册机';
+        const p = document.querySelector('.login-card p');
+        if (p) p.textContent = '如已登录后台，通常无需再次输入';
+      } catch {}
+    }
+
+    // API base when proxied under /reg/
+    // fetch('/api/...') works when page is served from same path root
+    // If under /reg/, relative /api would hit g2a not register — need rewrite
+    (function fixApiBase() {
+      const p = location.pathname;
+      if (p.startsWith('/reg')) {
+        const prefix = p.endsWith('/') ? p.slice(0, -1) : p.replace(/\/[^/]*$/, '');
+        // when url is /reg/ or /reg/?embed=1, prefix should be /reg
+        const base = p === '/reg' || p === '/reg/' || p.startsWith('/reg/?') || p.startsWith('/reg?')
+          ? '/reg'
+          : (p.startsWith('/reg/') ? '/reg' : '');
+        if (base) {
+          const origFetch = window.fetch.bind(window);
+          window.fetch = (input, init) => {
+            if (typeof input === 'string' && input.startsWith('/api/')) {
+              return origFetch(base + input, init);
+            }
+            return origFetch(input, init);
+          };
+        }
+      }
+    })();
+
+    document.querySelectorAll('.provider-tab').forEach((btn) => {
+      btn.addEventListener('click', () => setProvider(btn.dataset.p));
+    });
+    $('proxyMode').addEventListener('change', syncProxyMode);
+    $('proxy_airport_url')?.addEventListener('input', updateProxyPreview);
+    $('testProxyBtnAirport')?.addEventListener('click', testCliproxyFetch);
+    ['proxy_api_url','proxy_api_num','proxy_api_format','proxy_host','proxy_port','proxy_user','proxy_pass','proxy_country','proxy_delimiter','proxy_duration','proxy_user_template','proxy_session']
+      .forEach((id) => $(id)?.addEventListener('input', updateProxyPreview));
+    $('proxy_country')?.addEventListener('change', updateProxyPreview);
+    $('proxy_api_format')?.addEventListener('change', updateProxyPreview);
+    $('testProxyBtn')?.addEventListener('click', testCliproxyFetch);
+    $('loginBtn').addEventListener('click', tryAuth);
+    $('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryAuth(); });
+    $('saveBtn').addEventListener('click', () => saveConfig(false));
+    $('startBtn').addEventListener('click', startJob);
+    $('stopBtn').addEventListener('click', stopJob);
+    $('linkG2aBtn').addEventListener('click', () => linkG2a(true));
+    $('unlinkG2aBtn').addEventListener('click', () => linkG2a(false));
+    $('refreshG2aBtn').addEventListener('click', refreshIntegration);
+    $('clearLogBtn').addEventListener('click', () => {
+      $('term').innerHTML = '';
+      knownLogLines = new Set();
+    });
+    $('dlBtn').addEventListener('click', downloadAccounts);
+    $('listBtn').addEventListener('click', listAccountFiles);
+
+    (async () => {
+      const ok = await ensureAuth();
+      if (ok) await boot();
+    })();
+  </script>
+</body>
+</html>
