@@ -98,13 +98,23 @@ def main() -> int:
     proxy = (args.proxy or "").strip() or None
     now = time.time()
 
+    def _auth_jsons(dirpath: Path, *, reverse: bool = False) -> list[Path]:
+        """List xAI auth files only — exclude *.meta.json (xai-*.json matches both)."""
+        if not dirpath.is_dir():
+            return []
+        items = [
+            p
+            for p in dirpath.glob("xai-*.json")
+            if p.is_file() and not p.name.endswith(".meta.json")
+        ]
+        return sorted(items, key=lambda x: x.stat().st_mtime, reverse=reverse)
+
     files: list[tuple[str, Path]] = []
-    if pending.is_dir():
-        for p in sorted(pending.glob("xai-*.json"), key=lambda x: x.stat().st_mtime):
-            files.append(("pending", p))
-    if args.also_quarantine and quar.is_dir():
+    for p in _auth_jsons(pending):
+        files.append(("pending", p))
+    if args.also_quarantine:
         # Newest first: more likely to recover
-        for p in sorted(quar.glob("xai-*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        for p in _auth_jsons(quar, reverse=True):
             files.append(("quarantine", p))
 
     # de-dupe by name prefer pending
