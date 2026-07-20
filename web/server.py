@@ -53,6 +53,9 @@ SECRET_FIELDS = {
     "grok2api_remote_app_key",
     "proxy",
     "proxy_pass",
+    "mailnest_api_key",
+    "cloudmail_password",
+    "cpa_management_key",
 }
 
 # In-memory sessions: token -> expiry ts
@@ -208,6 +211,38 @@ class ConfigBody(BaseModel):
     email_provider: Optional[str] = None
     yyds_api_key: Optional[str] = None
     yyds_jwt: Optional[str] = None
+    yyds_default_domain: Optional[str] = None
+    duckmail_api_base: Optional[str] = None
+    mailnest_api_key: Optional[str] = None
+    mailnest_project_code: Optional[str] = None
+    cloudmail_url: Optional[str] = None
+    cloudmail_admin_email: Optional[str] = None
+    cloudmail_password: Optional[str] = None
+    cpa_export_enabled: Optional[bool] = None
+    cpa_auth_dir: Optional[str] = None
+    cpa_copy_to_hotload: Optional[bool] = None
+    cpa_hotload_dir: Optional[str] = None
+    cpa_remote_url: Optional[str] = None
+    cpa_management_key: Optional[str] = None
+    cpa_remote_timeout_sec: Optional[float] = None
+    cpa_remote_upload_on_chat_fail: Optional[bool] = None
+    cpa_probe_chat: Optional[bool] = None
+    cpa_chat_required_for_hotload: Optional[bool] = None
+
+
+@app.get("/api/connectivity")
+async def api_connectivity(x_access_key: Optional[str] = Header(None)):
+    """代理 / 邮箱 / CPA 本地+远程 Management 连通性检查。"""
+    _require_auth(x_access_key)
+    engine.load_config()
+    from connectivity import format_check_results, run_connectivity_checks
+
+    results = run_connectivity_checks(engine.config, engine.http_get, engine.http_post)
+    return {
+        "ok": all(ok for _n, ok, _d in results),
+        "results": [{"name": n, "ok": ok, "detail": d} for n, ok, d in results],
+        "text": format_check_results(results),
+    }
 
 
 def _run_job(count: int) -> None:

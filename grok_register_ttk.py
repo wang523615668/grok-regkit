@@ -135,6 +135,13 @@ DEFAULT_CONFIG = {
     "cpa_hotload_dir": "",  # set to CPA auth-dir on server, e.g. /opt/cliproxyapi/auths
     "cpa_base_url": "https://cli-chat-proxy.grok.com/v1",
     "cpa_proxy": "",  # empty = fall back to runtime proxy / airport
+    # Remote CPA Management API (optional; from grokRegister-cpa)
+    # POST {cpa_remote_url}/v0/management/auth-files?name=xai-*.json
+    "cpa_remote_url": "",  # e.g. http://127.0.0.1:8317
+    "cpa_management_key": "",  # remote-management.secret-key / CPA_MGMT_KEY
+    "cpa_remote_timeout_sec": 30,
+    # only upload when chat gate allows hotload (default); true=also upload soft/hard fails
+    "cpa_remote_upload_on_chat_fail": False,
     # Protocol mint needs no browser; fallback browser MUST be headed (Xvfb) on servers.
     "cpa_headless": False,
     "cpa_force_standalone": True,
@@ -157,6 +164,18 @@ DEFAULT_CONFIG = {
     # 后台入池：浏览器松了再多试几次，比注册高峰硬等 502 更划算
     "grok2api_bg_max_http_tries": 6,
     "grok2api_bg_http_timeout_sec": 15,
+    # Extra email providers (MailNest / CloudMail) — optional
+    "duckmail_api_base": "https://api.duckmail.sbs",
+    "mailnest_api_key": "",
+    "mailnest_project_code": "x-ai001",
+    "cloudmail_url": "",
+    "cloudmail_admin_email": "",
+    "cloudmail_password": "",
+    "defaultDomains": "",
+    "email_provider": "duckmail",
+    "yyds_api_key": "",
+    "yyds_jwt": "",
+    "yyds_default_domain": "",
 }
 
 config = DEFAULT_CONFIG.copy()
@@ -2093,6 +2112,18 @@ def http_post(url, **kwargs):
         raise
 
 
+def http_delete(url, **kwargs):
+    request_kwargs = _build_request_kwargs(**kwargs)
+    try:
+        return requests.delete(url, **request_kwargs)
+    except Exception as exc:
+        if request_kwargs.get("proxies") and is_proxy_connection_error(exc):
+            retry_kwargs = dict(kwargs)
+            retry_kwargs["proxies"] = {}
+            return requests.delete(url, **_build_request_kwargs(**retry_kwargs))
+        raise
+
+
 def raise_if_cancelled(cancel_callback=None):
     if cancel_callback and cancel_callback():
         raise RegistrationCancelled("鐢ㄦ埛鍋滄娉ㄥ唽")
@@ -2463,6 +2494,36 @@ def get_email_and_token(api_key=None):
     provider = get_email_provider()
     if provider == "yyds":
         return yyds_get_email_and_token(api_key=api_key, jwt=get_yyds_jwt())
+    if provider == "mailnest":
+        from email_providers import mailnest as mailnest_provider
+
+        key = str(config.get("mailnest_api_key") or "").strip()
+        project = str(config.get("mailnest_project_code") or "x-ai001").strip()
+        address = mailnest_provider.buy_email(http_post, key, project)
+        # MailNest 用邮箱本身当收信句柄，token 占位
+        return address, "mailnest"
+    if provider == "cloudmail":
+        from email_providers import cloudmail as cloudmail_provider
+
+        url = str(config.get("cloudmail_url") or "").rstrip("/")
+        admin_email = str(
+            config.get("cloudmail_admin_email")
+            or os.environ.get("CLOUDMAIL_ADMIN_EMAIL")
+            or ""
+        ).strip()
+        admin_password = str(
+            config.get("cloudmail_password")
+            or os.environ.get("CLOUDMAIL_PASSWORD")
+            or ""
+        ).strip()
+        domains = [
+            x.strip()
+            for x in str(config.get("defaultDomains", "") or "").split(",")
+            if x.strip()
+        ]
+        return cloudmail_provider.create_mailbox(
+            http_post, url, admin_email, admin_password, domains
+        )
     if provider == "cloudflare":
         api_base = get_cloudflare_api_base()
         if not api_base:
@@ -2499,7 +2560,7 @@ def get_email_and_token(api_key=None):
     create_account(address, password, api_key=key, expires_in=0)
     token = get_token(address, password)
     if not token:
-        raise Exception("鑾峰彇 DuckMail token 澶辫触")
+        raise Exception("获取 DuckMail token 失败")
     return address, token
 
 
@@ -2522,6 +2583,50 @@ def get_oai_code(
             log_callback=log_callback,
             jwt=get_yyds_jwt(),
             cancel_callback=cancel_callback,
+        )
+    if provider == "mailnest":
+        from email_providers import mailnest as mailnest_provider
+
+        key = str(config.get("mailnest_api_key") or "").strip()
+        return mailnest_provider.wait_for_code(
+            http_post,
+            key,
+            email,
+            timeout=timeout,
+            poll_interval=poll_interval,
+            raise_if_cancelled=raise_if_cancelled,
+            sleep_with_cancel=sleep_with_cancel,
+            log_callback=log_callback,
+            cancel_callback=cancel_callback,
+        )
+    if provider == "cloudmail":
+        from email_providers import cloudmail as cloudmail_provider
+
+        url = str(config.get("cloudmail_url") or "").rstrip("/")
+        admin_email = str(
+            config.get("cloudmail_admin_email")
+            or os.environ.get("CLOUDMAIL_ADMIN_EMAIL")
+            or ""
+        ).strip()
+        admin_password = str(
+            config.get("cloudmail_password")
+            or os.environ.get("CLOUDMAIL_PASSWORD")
+            or ""
+        ).strip()
+        return cloudmail_provider.wait_for_code(
+            http_post,
+            http_delete,
+            url,
+            admin_email,
+            admin_password,
+            email,
+            timeout=timeout,
+            poll_interval=poll_interval,
+            raise_if_cancelled=raise_if_cancelled,
+            sleep_with_cancel=sleep_with_cancel,
+            log_callback=log_callback,
+            cancel_callback=cancel_callback,
+            resend_callback=resend_callback,
         )
     if provider == "cloudflare":
         return cloudflare_get_oai_code(
@@ -4613,7 +4718,12 @@ class GrokRegisterGUI:
 
         add_label(0, 0, "邮箱服务商:")
         self.email_provider_var = tk.StringVar(value=config.get("email_provider", "duckmail"))
-        self.email_provider_combo = tk_option_menu(config_frame, self.email_provider_var, ["duckmail", "yyds", "cloudflare"], width=12)
+        self.email_provider_combo = tk_option_menu(
+            config_frame,
+            self.email_provider_var,
+            ["duckmail", "yyds", "cloudflare", "mailnest", "cloudmail"],
+            width=12,
+        )
         add_field(self.email_provider_combo, 0, 1, sticky=tk.W)
 
         add_label(0, 2, "注册数量:")

@@ -389,6 +389,41 @@ def export_cpa_xai_for_account(
             log(f"[cpa] quarantine copy failed: {e}")
             result["quarantine_error"] = str(e)
 
+    # Optional: upload to remote CPA Management API (from grokRegister-cpa).
+    # Default: only when hotload is allowed (chat gate passed), matching local hotload policy.
+    remote_url = str(cfg.get("cpa_remote_url") or "").strip().rstrip("/")
+    mgmt_key = str(cfg.get("cpa_management_key") or "").strip()
+    if not mgmt_key:
+        mgmt_key = (
+            os.environ.get("CPA_MGMT_KEY")
+            or os.environ.get("CPA_MANAGEMENT_KEY")
+            or os.environ.get("CLIPROXYAPI_MANAGEMENT_KEY")
+            or ""
+        ).strip()
+    upload_on_chat_fail = bool(cfg.get("cpa_remote_upload_on_chat_fail", False))
+    want_remote = bool(remote_url and mgmt_key and result.get("path"))
+    if want_remote and (allow_hotload or upload_on_chat_fail):
+        try:
+            rec_path = Path(result["path"])
+            record = json.loads(rec_path.read_text(encoding="utf-8"))
+            if not isinstance(record, dict):
+                raise ValueError("auth record is not an object")
+            name = upload_cpa_auth_remote(
+                remote_url,
+                mgmt_key,
+                record,
+                timeout=float(cfg.get("cpa_remote_timeout_sec", 30) or 30),
+            )
+            result["cpa_remote_name"] = name
+            result["cpa_remote_url"] = remote_url
+            log(f"[cpa] remote Management upload OK -> {remote_url}/.../{name}")
+        except Exception as e:  # noqa: BLE001
+            log(f"[cpa] remote Management upload failed: {e}")
+            result["cpa_remote_error"] = str(e)
+    elif want_remote and not allow_hotload:
+        result["cpa_remote_skipped"] = "chat_gate_blocked"
+        log("[cpa] remote upload skipped (chat gate blocked; set cpa_remote_upload_on_chat_fail=true to force)")
+
     # failure log under register dir
     if not result.get("ok"):
         fail_path = out_dir / "cpa_auth_failed.txt"
@@ -401,3 +436,51 @@ def export_cpa_xai_for_account(
             raise RuntimeError(f"CPA chat required but failed: {result.get('error')}")
 
     return result
+
+
+def upload_cpa_auth_remote(
+    base_url: str,
+    management_key: str,
+    record: dict,
+    timeout: float = 30,
+) -> str:
+    """POST /v0/management/auth-files?name=<file.json> to remote CLIProxyAPI.
+
+    Aligns with grokRegister-cpa Management API upload.
+    """
+    import requests
+
+    base = str(base_url or "").strip().rstrip("/")
+    key = str(management_key or "").strip()
+    if not base:
+        raise ValueError("cpa_remote_url 为空")
+    if not key:
+        raise ValueError("cpa_management_key 为空")
+
+    email = str(record.get("email") or "").strip()
+    sub = str(record.get("sub") or "").strip()
+    ident = email or sub or "unknown"
+    # sanitize filename like local writer
+    safe = "".join(ch if ch.isalnum() or ch in "._@+-" else "_" for ch in ident)
+    name = safe if safe.lower().startswith("xai") else f"xai-{safe}"
+    if not name.endswith(".json"):
+        name = f"{name}.json"
+
+    url = f"{base}/v0/management/auth-files"
+    resp = requests.post(
+        url,
+        params={"name": name},
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+        data=json.dumps(record, ensure_ascii=False).encode("utf-8"),
+        timeout=timeout,
+        proxies={"http": None, "https": None},
+    )
+    if resp.status_code >= 400:
+        body = (resp.text or "").strip()
+        if len(body) > 300:
+            body = body[:300] + "..."
+        raise RuntimeError(f"远程上传失败 HTTP {resp.status_code}: {body or resp.reason}")
+    return name

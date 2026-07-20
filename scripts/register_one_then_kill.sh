@@ -10,6 +10,15 @@ set -u
 
 GROK_REG="${GROK_REG:-/vol1/1000/openzl/grok-regkit}"
 CPA_AUTH="${CPA_AUTH:-/vol1/1000/openzl/cpa/auths}"
+CPA_SECRETS="${CPA_SECRETS:-/vol1/1000/openzl/cpa/.secrets.env}"
+# Load CPA_MGMT_KEY for remote Management upload (optional)
+if [[ -f "$CPA_SECRETS" ]]; then
+  # shellcheck disable=SC1090
+  set -a
+  # shellcheck source=/dev/null
+  . "$CPA_SECRETS"
+  set +a
+fi
 PY="${GROK_REG}/.venv/bin/python"
 RUNNER="${GROK_REG}/run_hybrid_n.py"
 LOG="${LOG:-/tmp/grok_register_one_kill.log}"
